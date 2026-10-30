@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>visioSpark – Event Registration</title>
+<style>
+  :root { --bg:#f6f7f4; --card:#fff; --ink:#14213d; --muted:#5c667a; --line:#d9dde5; --spark:#ff6b35; --ok:#1b7f5c; --err:#b3261e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f1626; --card:#18223a; --ink:#eef1f7; --muted:#9aa5bd; --line:#2b3754; --spark:#ff8a5c; --ok:#4cc79b; --err:#ff8d86; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width: 960px; margin: 0 auto; padding: 48px 20px; display:grid; gap:40px; grid-template-columns: 1fr 1fr; align-items:start; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  h1 { font-size: clamp(2.4rem, 6vw, 3.6rem); letter-spacing:-.03em; margin:0 0 12px; line-height:1; }
+  h1 span { color: var(--spark); }
+  p.lead { color: var(--muted); max-width: 36ch; margin:0 0 28px; }
+  ul { list-style:none; padding:0; margin:0; display:grid; gap:10px; }
+  li { padding:12px 14px; border-left:4px solid var(--spark); background:var(--card); border-radius:0 8px 8px 0; }
+  li small { display:block; color:var(--muted); }
+  form { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:24px; display:grid; gap:14px; }
+  label { display:grid; gap:4px; font-weight:600; font-size:.9rem; }
+  input, select { font:inherit; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); }
+  input:focus-visible, select:focus-visible, button:focus-visible { outline:3px solid var(--spark); outline-offset:1px; }
+  button { font:inherit; font-weight:700; padding:12px; border:0; border-radius:8px; background:var(--spark); color:#1a1209; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:wait; }
+  #msg { min-height:1.4em; margin:0; font-weight:600; }
+  #msg.ok { color:var(--ok); } #msg.err { color:var(--err); }
+</style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>visio<span>Spark</span></h1>
+    <p class="lead">Pick an event, reserve your seat, and we will see you there.</p>
+    <ul id="events"><li>Loading events…</li></ul>
+  </section>
+
+  <form id="form">
+    <label>Full name <input name="full_name" required maxlength="100" autocomplete="name"></label>
+    <label>Email <input name="email" type="email" required maxlength="150" autocomplete="email"></label>
+    <label>Phone <input name="phone" type="tel" maxlength="30" autocomplete="tel"></label>
+    <label>Event <select name="event_name" id="event" required></select></label>
+    <button type="submit" id="btn">Register for this event</button>
+    <p id="msg" role="status"></p>
+  </form>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+async function loadEvents() {
+  try {
+    const events = await (await fetch('/api/events')).json();
+    $('events').innerHTML = events.map(e =>
+      `<li><strong>${e.name}</strong><small>${e.date} · ${e.venue} · ${e.registrations} registered</small></li>`).join('');
+    $('event').innerHTML = events.map(e => `<option>${e.name}</option>`).join('');
+  } catch {
+    $('events').innerHTML = '<li>Events could not be loaded. Refresh to try again.</li>';
+  }
+}
+
+$('form').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const msg = $('msg'), btn = $('btn');
+  btn.disabled = true; msg.className = ''; msg.textContent = 'Saving…';
+  try {
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.fromEntries(new FormData(ev.target)))
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Registration failed');
+    msg.className = 'ok'; msg.textContent = 'You are registered. See you at the event!';
+    ev.target.reset(); loadEvents();
+  } catch (e) {
+    msg.className = 'err'; msg.textContent = e.message;
+  } finally { btn.disabled = false; }
+});
+
+loadEvents();
+</script>
+</body>
+</html>
